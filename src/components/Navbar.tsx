@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Calendar, RefreshCw, BarChart3, Users, MoonStar, Bell } from 'lucide-react';
-import { formatIndonesianDate } from '@/lib/dateUtils';
+import { formatIndonesianDate } from '../lib/dateUtils';
 import { TabType } from './BottomNav';
 
 interface NavbarProps {

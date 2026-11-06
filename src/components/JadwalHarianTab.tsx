@@ -1,14 +1,12 @@
-'use client';
-
 import React, { useState } from 'react';
 import {
   HARI_NAMES,
   getIndonesianDayNumber,
   formatIndonesianDate,
   generateWaLink,
-} from '@/lib/dateUtils';
+} from '../lib/dateUtils';
 import { Clock, MapPin, User, Plus, Trash2, Send, Copy, Check } from 'lucide-react';
-import { createJadwalTetap, deleteJadwalTetap } from '@/lib/actions';
+import { createJadwal, deleteJadwal } from '../api/client';
 
 interface Musyrif {
   id: string;
@@ -66,7 +64,7 @@ export default function JadwalHarianTab({
       alert('Pilih musyrif terlebih dahulu');
       return;
     }
-    await createJadwalTetap({
+    await createJadwal({
       ...formData,
       hari: Number(formData.hari),
     });
@@ -76,7 +74,7 @@ export default function JadwalHarianTab({
 
   const handleDelete = async (id: string) => {
     if (confirm('Apakah antum yakin ingin menghapus jadwal ini?')) {
-      await deleteJadwalTetap(id);
+      await deleteJadwal(id);
       onRefresh();
     }
   };
@@ -98,43 +96,43 @@ export default function JadwalHarianTab({
         text += `   📌 *${item.kegiatan}*\n`;
         text += `   👤 Ustadz: *${item.musyrif.name}*\n`;
         if (item.lokasi) text += `   📍 Lokasi: ${item.lokasi}\n`;
-        if (item.keterangan) text += `   📝 Catatan: ${item.keterangan}\n`;
+        if (item.keterangan) text += `   📝 Ket: ${item.keterangan}\n`;
         text += `\n`;
       });
-      text += `_Mohon asatidzah yang bertugas hadir tepat waktu dan mengisi presensi halaqah._\n`;
-      text += `Jazakumullah khairan.`;
     }
 
+    text += `Semoga Allah Ta'ala melimpahkan kelancaran dan keberkahan dalam tugas hari ini. Barakallahu fiikum.`;
     return text;
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(generateMessageText());
+    const text = generateMessageText();
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="space-y-6">
       {/* Header & Quick Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-sm">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-stone-900 flex items-center gap-2">
+          <h2 className="text-xl font-bold text-stone-900 flex items-center gap-2">
             <span>Jadwal Tetap Harian</span>
-            <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-0.5 rounded-full">
               {filteredJadwal.length} Agenda
             </span>
           </h2>
-          <p className="text-xs sm:text-sm text-stone-500 mt-0.5">
-            Jadwal kegiatan rutin harian seperti Tasmi&apos; dan piket musyrif.
+          <p className="text-sm text-stone-500 mt-0.5">
+            Jadwal kegiatan rutin harian seperti Tasmi' jam 08.00 dan ba'da Dzuhur.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2">
           {/* Tombol Kirim WA */}
           <button
             onClick={() => setShowWaPreview(true)}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm transition-all shadow-xs active:scale-95"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm transition-all shadow-sm active:scale-95"
           >
             <Send className="w-4 h-4" />
             <span>Kirim Pengingat WA</span>
@@ -143,50 +141,48 @@ export default function JadwalHarianTab({
           {/* Tombol Tambah */}
           <button
             onClick={() => {
-              setFormData((prev) => ({ ...prev, hari: selectedHari }));
+              setFormData((prev) => ({ ...prev, hari: selectedHari, musyrifId: prev.musyrifId || musyrifList[0]?.id || '' }));
               setShowAddModal(true);
             }}
-            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-medium text-xs sm:text-sm transition-all active:scale-95"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-medium text-sm transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden xs:inline">Tambah Jadwal</span>
-            <span className="xs:hidden">Tambah</span>
+            <span className="hidden sm:inline">Tambah Jadwal</span>
           </button>
         </div>
       </div>
 
-      {/* Selector Hari (Senin - Ahad) Snap Carousel */}
-      <div className="flex space-x-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar snap-x snap-mandatory">
+      {/* Selector Hari (Senin - Ahad) */}
+      <div className="flex space-x-1.5 overflow-x-auto pb-1 no-scrollbar">
         {[1, 2, 3, 4, 5, 6, 7].map((h) => {
           const isSelected = selectedHari === h;
           const isToday = todayDayNum === h;
-          const count = jadwalList.filter((j) => j.hari === h).length;
           return (
             <button
               key={h}
               onClick={() => setSelectedHari(h)}
-              className={`snap-start shrink-0 flex-1 min-w-[76px] py-2 px-2 rounded-2xl text-center text-xs font-medium transition-all active:scale-95 ${
+              className={`flex-1 min-w-[85px] py-2.5 px-3 rounded-xl text-center text-sm font-medium transition-all ${
                 isSelected
-                  ? 'bg-gradient-to-b from-emerald-700 to-emerald-800 text-white shadow-md ring-2 ring-emerald-600/30'
-                  : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200/80 shadow-xs'
+                  ? 'bg-emerald-800 text-white shadow-md ring-2 ring-emerald-600/30'
+                  : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'
               }`}
             >
-              <div className="flex items-center justify-center gap-1 font-bold">
+              <div className="flex items-center justify-center gap-1">
                 <span>{HARI_NAMES[h]}</span>
                 {isToday && (
                   <span
                     className={`w-1.5 h-1.5 rounded-full ${
-                      isSelected ? 'bg-amber-300 animate-pulse' : 'bg-emerald-600'
+                      isSelected ? 'bg-amber-300' : 'bg-emerald-600'
                     }`}
                   />
                 )}
               </div>
               <div
-                className={`text-[10px] mt-0.5 ${
+                className={`text-[11px] mt-0.5 ${
                   isSelected ? 'text-emerald-200' : 'text-stone-400'
                 }`}
               >
-                {count} sesi
+                {jadwalList.filter((j) => j.hari === h).length} sesi
               </div>
             </button>
           );
@@ -195,37 +191,37 @@ export default function JadwalHarianTab({
 
       {/* Daftar Jadwal Pada Hari Terpilih */}
       {filteredJadwal.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-stone-300 p-8 sm:p-10 text-center">
+        <div className="bg-white rounded-2xl border border-dashed border-stone-300 p-10 text-center">
           <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 mx-auto flex items-center justify-center mb-3">
             <Clock className="w-6 h-6" />
           </div>
-          <h3 className="font-semibold text-stone-800 text-sm sm:text-base">
+          <h3 className="font-semibold text-stone-800">
             Belum ada jadwal tetap untuk hari {HARI_NAMES[selectedHari]}
           </h3>
-          <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
+          <p className="text-sm text-stone-500 mt-1 max-w-sm mx-auto">
             Klik tombol &quot;Tambah Jadwal&quot; untuk mendaftarkan tugas rutin harian para musyrif.
           </p>
           <button
             onClick={() => {
-              setFormData((prev) => ({ ...prev, hari: selectedHari }));
+              setFormData((prev) => ({ ...prev, hari: selectedHari, musyrifId: prev.musyrifId || musyrifList[0]?.id || '' }));
               setShowAddModal(true);
             }}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-medium hover:bg-emerald-700 transition active:scale-95"
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition"
           >
             <Plus className="w-4 h-4" />
             Tambah Jadwal Baru
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredJadwal.map((item) => (
             <div
               key={item.id}
-              className="bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow relative flex flex-col justify-between"
+              className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:shadow-md transition-shadow relative group flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-start justify-between">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
                     <Clock className="w-3.5 h-3.5 text-emerald-600" />
                     <span>
                       {item.jamMulai} - {item.jamSelesai}
@@ -241,11 +237,9 @@ export default function JadwalHarianTab({
                   </button>
                 </div>
 
-                <h3 className="text-base sm:text-lg font-bold text-stone-900 mt-2.5">
-                  {item.kegiatan}
-                </h3>
+                <h3 className="text-lg font-bold text-stone-900 mt-3">{item.kegiatan}</h3>
 
-                <div className="mt-2.5 space-y-1.5 text-xs sm:text-sm text-stone-600">
+                <div className="mt-3 space-y-1.5 text-sm text-stone-600">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-emerald-700 shrink-0" />
                     <span className="font-semibold text-stone-900">{item.musyrif.name}</span>
@@ -259,15 +253,15 @@ export default function JadwalHarianTab({
                   )}
 
                   {item.keterangan && (
-                    <p className="text-xs text-stone-400 bg-stone-50 p-2 rounded-lg border border-stone-100 italic">
-                      &ldquo;{item.keterangan}&rdquo;
+                    <p className="text-xs text-stone-500 bg-stone-50 p-2 rounded-lg mt-2">
+                      💡 {item.keterangan}
                     </p>
                   )}
                 </div>
               </div>
 
               {/* Action Personal WA */}
-              <div className="mt-3.5 pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
+              <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
                 <span className="text-stone-400">Petugas Hari {HARI_NAMES[item.hari]}</span>
                 {item.musyrif.phone ? (
                   <a
@@ -277,10 +271,10 @@ export default function JadwalHarianTab({
                     )}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-emerald-700 font-semibold hover:underline"
+                    className="inline-flex items-center gap-1 text-emerald-700 font-medium hover:underline"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    Ingatkan WA
+                    Ingatkan Personal
                   </a>
                 ) : (
                   <span className="text-stone-400 italic">No WA belum diisi</span>
@@ -291,49 +285,46 @@ export default function JadwalHarianTab({
         </div>
       )}
 
-      {/* Modal / Bottom Sheet Preview & Kirim WhatsApp */}
+      {/* Modal Preview & Kirim WhatsApp */}
       {showWaPreview && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/60 backdrop-blur-xs p-0 sm:p-4">
-          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto">
-            {/* Grab handle for mobile */}
-            <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto sm:hidden -mt-1 mb-2" />
-
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-stone-900 text-base sm:text-lg flex items-center gap-2">
+              <h3 className="font-bold text-stone-900 text-lg flex items-center gap-2">
                 <Send className="w-5 h-5 text-emerald-600" />
                 Format Pengingat WhatsApp
               </h3>
               <button
                 onClick={() => setShowWaPreview(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg font-bold p-1"
+                className="text-stone-400 hover:text-stone-600 text-lg font-bold"
               >
                 ✕
               </button>
             </div>
 
             <p className="text-xs text-stone-500">
-              Pesan ini siap dibagikan ke grup musyrif untuk jadwal{' '}
+              Pesan ini siap dibagikan ke grup musyrif atau broadcast list untuk jadwal{' '}
               <strong>Hari {HARI_NAMES[selectedHari]}</strong>.
             </p>
 
-            <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs text-stone-800 font-mono whitespace-pre-wrap max-h-56 overflow-y-auto">
+            <div className="bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-xs text-stone-800 font-mono whitespace-pre-wrap max-h-60 overflow-y-auto">
               {generateMessageText()}
             </div>
 
             <div className="flex items-center gap-2 pt-2">
               <button
                 onClick={handleCopy}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-700 text-xs sm:text-sm font-medium transition active:scale-95"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-100 text-stone-700 text-sm font-medium transition"
               >
                 {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? 'Tersalin!' : 'Salin Teks'}</span>
+                <span>{copied ? 'Tersalin ke Clipboard!' : 'Salin Teks'}</span>
               </button>
 
               <a
                 href={`https://wa.me/?text=${encodeURIComponent(generateMessageText())}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium transition shadow-xs active:scale-95"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition shadow-sm"
               >
                 <Send className="w-4 h-4" />
                 <span>Buka WhatsApp</span>
@@ -343,21 +334,18 @@ export default function JadwalHarianTab({
         </div>
       )}
 
-      {/* Modal / Bottom Sheet Tambah Jadwal Tetap */}
+      {/* Modal Tambah Jadwal Tetap */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/60 backdrop-blur-xs p-0 sm:p-4">
-          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto">
-            {/* Grab handle for mobile */}
-            <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto sm:hidden -mt-1 mb-2" />
-
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-stone-900 text-base sm:text-lg flex items-center gap-2">
+              <h3 className="font-bold text-stone-900 text-lg flex items-center gap-2">
                 <Plus className="w-5 h-5 text-emerald-600" />
                 Tambah Jadwal Tetap
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg font-bold p-1"
+                className="text-stone-400 hover:text-stone-600 text-lg font-bold"
               >
                 ✕
               </button>
@@ -473,7 +461,7 @@ export default function JadwalHarianTab({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs transition active:scale-95"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition"
                 >
                   Simpan Jadwal
                 </button>
