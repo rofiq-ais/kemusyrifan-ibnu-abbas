@@ -1,0 +1,84 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Musyrif {
+  id        String   @id @default(cuid())
+  name      String
+  nickname  String?
+  phone     String?  // Format: 628xxxxxxxxxx
+  role      String   @default("MUSYRIF") // "ADMIN" atau "MUSYRIF"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relasi
+  jadwalTetap           JadwalTetap[]
+  tugasBadalDiambil     TugasBadal[]  @relation("Pengganti")
+  tugasBadalDigantikan  TugasBadal[]  @relation("Digantikan")
+
+  @@map("musyrif")
+}
+
+model JadwalTetap {
+  id          String   @id @default(cuid())
+  hari        Int      // 1 = Senin, 2 = Selasa, 3 = Rabu, 4 = Kamis, 5 = Jumat, 6 = Sabtu, 7 = Ahad
+  jamMulai    String   // Format "HH:mm", misal "08:00"
+  jamSelesai  String   // Format "HH:mm", misal "09:30"
+  kegiatan    String   // Misal: "Tasmi' Pagi", "Tasmi' Ba'da Dzuhur", "KBM Pagi"
+  lokasi      String?  // Misal: "Masjid Utama", "Gedung MI", "Gedung MTS"
+  keterangan  String?
+  musyrifId   String
+  musyrif     Musyrif  @relation(fields: [musyrifId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([hari])
+  @@map("jadwal_tetap")
+}
+
+enum StatusBadal {
+  OPEN       // Sedang ditawarkan ke semua musyrif
+  CLAIMED    // Sudah diambil secara sukarela oleh musyrif via aplikasi
+  ASSIGNED   // Ditunjuk langsung oleh admin via sistem keadilan
+  COMPLETED  // Tugas selesai dilaksanakan
+  CANCELLED  // Dibatalkan
+}
+
+enum TipePenetapan {
+  SUKARELA   // Diklaim sendiri
+  PENUNJUKAN // Ditunjuk oleh admin
+}
+
+model TugasBadal {
+  id                 String         @id @default(cuid())
+  tanggal            DateTime       // Tanggal tugas
+  jamMulai           String         // "09:30"
+  jamSelesai         String         // "11:00"
+  judul              String         // "Badal KBM Fiqih MI"
+  keterangan         String?        // Alasan izin / catatan tugas
+  lokasi             String?        // "Kelas 5 MI"
+  status             StatusBadal    @default(OPEN)
+  tipePenetapan      TipePenetapan?
+  
+  // Musyrif yang izin/digantikan (opsional jika tugas umum)
+  musyrifAsliId      String?
+  musyrifAsli        Musyrif?       @relation("Digantikan", fields: [musyrifAsliId], references: [id], onDelete: SetNull)
+
+  // Musyrif yang menggantikan
+  musyrifPenggantiId String?
+  musyrifPengganti   Musyrif?       @relation("Pengganti", fields: [musyrifPenggantiId], references: [id], onDelete: SetNull)
+
+  claimedAt          DateTime?      // Waktu saat diklaim/ditunjuk
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([tanggal])
+  @@index([status])
+  @@map("tugas_badal")
+}
