@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Award, BarChart3, ShieldCheck, HeartHandshake, Calendar, CheckCircle2, TrendingUp, Sparkles } from 'lucide-react';
-import { formatIndonesianDate } from '@/lib/dateUtils';
+import { formatIndonesianDate } from '../lib/dateUtils';
 
 interface LeaderboardItem {
   id: string;

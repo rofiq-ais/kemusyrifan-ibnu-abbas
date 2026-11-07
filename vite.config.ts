@@ -2,12 +2,18 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { neon } from '@neondatabase/serverless';
+import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const dbUrl = env.DATABASE_URL;
 
   return {
+    resolve: {
+      alias: {
+        '@': path.resolve(process.cwd(), './src'),
+      },
+    },
     plugins: [
       tailwindcss(),
       react(),
