@@ -1,8 +1,22 @@
-'use client';
-
-import React from 'react';
-import { Award, BarChart3, ShieldCheck, HeartHandshake, Calendar, CheckCircle2, TrendingUp, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  Award,
+  BarChart3,
+  ShieldCheck,
+  HeartHandshake,
+  Calendar,
+  CheckCircle2,
+  TrendingUp,
+  Sparkles,
+  RotateCcw,
+  Trash2,
+  AlertTriangle,
+  X,
+  Check,
+} from 'lucide-react';
 import { formatIndonesianDate } from '../lib/dateUtils';
+import { useAuth } from '../context/AuthContext';
+import { resetRekapBadal } from '../api/client';
 
 interface LeaderboardItem {
   id: string;
@@ -17,11 +31,37 @@ interface LeaderboardItem {
 
 interface RekapPoinTabProps {
   leaderboard: LeaderboardItem[];
+  onRefresh?: () => void;
 }
 
-export default function RekapPoinTab({ leaderboard }: RekapPoinTabProps) {
+export default function RekapPoinTab({ leaderboard, onRefresh }: RekapPoinTabProps) {
+  const { isAdmin } = useAuth();
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetType, setResetType] = useState<'completed_only' | 'all'>('completed_only');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+
   const totalBulanIniSemua = leaderboard.reduce((acc, curr) => acc + curr.totalBulanIni, 0);
   const maxBadal = Math.max(...leaderboard.map((l) => l.totalBulanIni), 1);
+
+  const handleExecuteReset = async () => {
+    if (resetType === 'all' && confirmText.trim().toUpperCase() !== 'RESET') {
+      alert('Ketik "RESET" untuk mengonfirmasi reset total.');
+      return;
+    }
+    setResetLoading(true);
+    try {
+      await resetRekapBadal({ onlyCompleted: resetType === 'completed_only' });
+      setShowResetModal(false);
+      setConfirmText('');
+      if (onRefresh) onRefresh();
+      alert('Alhamdulillah, data riwayat badal berhasil dibersihkan.');
+    } catch (err: any) {
+      alert(err.message || 'Gagal mereset data');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -37,9 +77,22 @@ export default function RekapPoinTab({ leaderboard }: RekapPoinTabProps) {
           </p>
         </div>
 
-        <div className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Sistem Anti Pilih-Kasih</span>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {isAdmin && (
+            <button
+              onClick={() => setShowResetModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold border border-stone-200 transition"
+              title="Reset Riwayat Badal untuk Periode Baru"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-stone-600" />
+              <span>Reset Data</span>
+            </button>
+          )}
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Sistem Anti Pilih-Kasih</span>
+          </div>
         </div>
       </div>
 
@@ -240,6 +293,117 @@ export default function RekapPoinTab({ leaderboard }: RekapPoinTabProps) {
           </p>
         </div>
       </div>
+
+      {/* Modal Reset Data Riwayat (Khusus Admin) */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-stone-200 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-stone-900 text-sm">Reset / Bersihkan Riwayat Badal</h3>
+                  <p className="text-[11px] text-stone-400">Khusus Pengurus &amp; Administrator</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="p-1 rounded-lg text-stone-400 hover:text-stone-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <p className="text-stone-600">
+                Pilih cakupan data badal yang ingin antum bersihkan dari database:
+              </p>
+
+              <div className="space-y-2">
+                <label className={`block p-3 rounded-2xl border cursor-pointer transition ${
+                  resetType === 'completed_only' ? 'border-emerald-500 bg-emerald-50/50' : 'border-stone-200 hover:bg-stone-50'
+                }`}>
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="radio"
+                      name="resetType"
+                      checked={resetType === 'completed_only'}
+                      onChange={() => setResetType('completed_only')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <div className="font-bold text-stone-900">Bersihkan Tugas Selesai &amp; Dibatalkan (Aman)</div>
+                      <div className="text-[11px] text-stone-500 mt-0.5">
+                        Hanya menghapus riwayat lama (COMPLETED/CANCELLED). Tugas yang sedang aktif atau butuh pengganti tetap utuh.
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <label className={`block p-3 rounded-2xl border cursor-pointer transition ${
+                  resetType === 'all' ? 'border-rose-500 bg-rose-50/50' : 'border-stone-200 hover:bg-stone-50'
+                }`}>
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="radio"
+                      name="resetType"
+                      checked={resetType === 'all'}
+                      onChange={() => setResetType('all')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <div className="font-bold text-rose-900">Reset Total Semua Riwayat Badal</div>
+                      <div className="text-[11px] text-rose-700/80 mt-0.5">
+                        Menghapus seluruh tiket badal dan mereset poin keadilan ke 0 (Cocok untuk Awal Semester / Tahun Ajaran Baru).
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {resetType === 'all' && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 space-y-1.5">
+                  <span className="font-bold text-rose-800 text-[11px] block">
+                    Konfirmasi Keamanan:
+                  </span>
+                  <p className="text-[10px] text-rose-700">
+                    Ketik kata <span className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-rose-300">RESET</span> di bawah ini untuk melanjutkan:
+                  </p>
+                  <input
+                    type="text"
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    placeholder="Ketik RESET"
+                    className="w-full h-9 px-3 rounded-lg border border-rose-300 font-mono text-center tracking-widest text-xs uppercase focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="px-3 py-2 rounded-xl text-stone-600 hover:bg-stone-100 font-medium text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteReset}
+                disabled={resetLoading || (resetType === 'all' && confirmText.trim().toUpperCase() !== 'RESET')}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{resetLoading ? 'Membersihkan...' : 'Eksekusi Pembersihan'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

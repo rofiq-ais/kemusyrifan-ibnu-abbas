@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from './prisma';
-import { revalidatePath } from 'next/cache';
+const revalidatePath = (_path: string) => {};
 import { getIndonesianDayNumber } from './dateUtils';
 
 // ==================== 1. MUSYRIF ====================

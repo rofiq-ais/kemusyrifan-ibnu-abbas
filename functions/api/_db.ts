@@ -1,5 +1,14 @@
 import { neon } from '@neondatabase/serverless';
 
+declare global {
+  type PagesFunction<T = any> = (context: {
+    request: Request;
+    env: T;
+    params?: any;
+    data?: any;
+  }) => Promise<Response>;
+}
+
 export interface Env {
   DATABASE_URL: string;
 }

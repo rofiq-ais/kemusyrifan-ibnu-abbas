@@ -121,8 +121,185 @@ export async function fetchFairnessRecommendations(id: string) {
   return res.json();
 }
 
+export async function unclaimBadal(id: string) {
+  const res = await fetch(`/api/badal/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'unclaim' }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Gagal membatalkan klaim tugas');
+  }
+  return res.json();
+}
+
+export async function reassignBadal(id: string, musyrifId: string) {
+  const res = await fetch(`/api/badal/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'reassign', musyrifId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Gagal mengganti pengganti');
+  }
+  return res.json();
+}
+
+export async function cancelBadal(id: string) {
+  const res = await fetch(`/api/badal/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'cancel' }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Gagal membatalkan tiket');
+  }
+  return res.json();
+}
+
+export async function deleteBadal(id: string) {
+  const res = await fetch(`/api/badal/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Gagal menghapus tiket');
+  }
+  return res.json();
+}
+
+export async function updatePin(data: { musyrifId: string; oldPin: string; newPin: string }) {
+  const res = await fetch('/api/auth/update-pin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Gagal mengubah PIN');
+  }
+  return res.json();
+}
+
+export async function resetRekapBadal(options?: { onlyCompleted?: boolean }) {
+  const res = await fetch('/api/rekap/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(options || {}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Gagal mereset data riwayat');
+  }
+  return res.json();
+}
+
 export async function fetchRekapLeaderboard() {
   const res = await fetch('/api/rekap');
   if (!res.ok) throw new Error('Gagal mengambil rekapitulasi');
   return res.json();
 }
+
+// ==================== JADWAL BERSAMA & KESEHARIAN (FORMAT KETUA) ====================
+
+export async function fetchJadwalBersama() {
+  const res = await fetch('/api/jadwal-bersama');
+  if (!res.ok) throw new Error('Gagal mengambil jadwal bersama');
+  return res.json();
+}
+
+export async function saveJadwalBersama(items: any[]) {
+  const res = await fetch('/api/jadwal-bersama', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) throw new Error('Gagal menyimpan jadwal bersama');
+  return res.json();
+}
+
+export async function addJadwalBersamaItem(item: string) {
+  const res = await fetch('/api/jadwal-bersama', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item }),
+  });
+  if (!res.ok) throw new Error('Gagal menambah item jadwal bersama');
+  return res.json();
+}
+
+export async function deleteJadwalBersamaItem(id: string) {
+  const res = await fetch(`/api/jadwal-bersama?id=${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Gagal menghapus item jadwal bersama');
+  return res.json();
+}
+
+export async function fetchJadwalKeseharian(hari?: number) {
+  const url = hari ? `/api/jadwal-keseharian?hari=${hari}` : '/api/jadwal-keseharian';
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Gagal mengambil jadwal keseharian');
+  return res.json();
+}
+
+export async function saveJadwalKeseharianPos(data: {
+  id?: string;
+  hari: number;
+  kategori: string;
+  posName: string;
+  petugasIds: string[];
+  petugasCustom?: string;
+  urutan?: number;
+  keterangan?: string;
+}) {
+  const res = await fetch('/api/jadwal-keseharian', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Gagal menyimpan pos tugas');
+  return res.json();
+}
+
+export async function updateJadwalKeseharianPetugas(id: string, petugasIds: string[], petugasCustom?: string) {
+  const res = await fetch('/api/jadwal-keseharian', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, petugasIds, petugasCustom }),
+  });
+  if (!res.ok) throw new Error('Gagal memperbarui petugas pos');
+  return res.json();
+}
+
+export async function deleteJadwalKeseharianPos(id: string) {
+  const res = await fetch(`/api/jadwal-keseharian?id=${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Gagal menghapus pos tugas');
+  return res.json();
+}
+
+export async function duplicateJadwalKeseharian(fromHari: number, toHari: number) {
+  const res = await fetch('/api/jadwal-keseharian', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'duplicate', fromHari, toHari }),
+  });
+  if (!res.ok) throw new Error('Gagal menduplikasi jadwal');
+  return res.json();
+}
+
+export async function initPresetJadwalKeseharian(hari: number) {
+  const res = await fetch('/api/jadwal-keseharian', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'init_preset', hari }),
+  });
+  if (!res.ok) throw new Error('Gagal membuat template jadwal');
+  return res.json();
+}
+

@@ -227,32 +227,22 @@ export default function TimetablePekan({
             })}
           </div>
 
-          {/* Quick Broadcast WA Banner for the selected day */}
+          {/* Information bar for the selected day */}
           {(() => {
             const list = jadwalList
               .filter((j) => j.hari === selectedHari)
               .sort((a, b) => a.jamMulai.localeCompare(b.jamMulai));
 
             return (
-              <div className="flex items-center justify-between bg-emerald-50/80 border border-emerald-200/80 rounded-xl p-2.5 sm:p-3">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="text-xs font-bold text-emerald-950">
-                    Jadwal {HARI_NAMES[selectedHari]}
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-800">
+                    Agenda {HARI_NAMES[selectedHari]}
                   </span>
-                  <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    {list.length} Sesi
+                  <span className="text-[10px] font-semibold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-full">
+                    {list.length} Sesi Terjadwal
                   </span>
                 </div>
-
-                {onOpenSendWaReminder && (
-                  <button
-                    onClick={() => onOpenSendWaReminder(selectedHari)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Kirim ke Grup WA</span>
-                  </button>
-                )}
               </div>
             );
           })()}

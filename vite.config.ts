@@ -41,6 +41,92 @@ export default defineConfig(({ mode }) => {
             res.setHeader('Access-Control-Allow-Origin', '*');
 
             try {
+              // 0. Auth Endpoints
+              if (pathname === '/api/auth/login' && method === 'POST') {
+                let body = '';
+                req.on('data', chunk => body += chunk);
+                req.on('end', async () => {
+                  const data = JSON.parse(body || '{}');
+                  if (!data.musyrifId || !data.pin) {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ error: 'Nama musyrif dan PIN wajib diisi' }));
+                    return;
+                  }
+
+                  const rows = await sql`
+                    SELECT id, name, nickname, phone, role, pin, "isActive"
+                    FROM musyrif
+                    WHERE id = ${data.musyrifId}
+                    LIMIT 1
+                  `;
+
+                  if (rows.length === 0) {
+                    res.statusCode = 404;
+                    res.end(JSON.stringify({ error: 'Akun musyrif tidak ditemukan' }));
+                    return;
+                  }
+
+                  const u = rows[0] as any;
+                  if (!u.isActive) {
+                    res.statusCode = 403;
+                    res.end(JSON.stringify({ error: 'Akun musyrif sedang dinonaktifkan' }));
+                    return;
+                  }
+
+                  const validPin = u.pin || '123456';
+                  if (data.pin !== validPin) {
+                    res.statusCode = 401;
+                    res.end(JSON.stringify({ error: 'PIN yang antum masukkan salah' }));
+                    return;
+                  }
+
+                  res.end(JSON.stringify({
+                    success: true,
+                    user: {
+                      id: u.id,
+                      name: u.name,
+                      nickname: u.nickname,
+                      phone: u.phone,
+                      role: u.role,
+                      isActive: u.isActive
+                    }
+                  }));
+                });
+                return;
+              }
+
+              if (pathname === '/api/auth/update-pin' && method === 'POST') {
+                let body = '';
+                req.on('data', chunk => body += chunk);
+                req.on('end', async () => {
+                  const data = JSON.parse(body || '{}');
+                  if (!data.musyrifId || !data.newPin) {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ error: 'ID musyrif dan PIN baru wajib diisi' }));
+                    return;
+                  }
+
+                  const rows = await sql`SELECT pin FROM musyrif WHERE id = ${data.musyrifId} LIMIT 1`;
+                  if (rows.length === 0) {
+                    res.statusCode = 404;
+                    res.end(JSON.stringify({ error: 'Musyrif tidak ditemukan' }));
+                    return;
+                  }
+
+                  const currentPin = rows[0].pin || '123456';
+                  if (data.oldPin && data.oldPin !== currentPin) {
+                    res.statusCode = 401;
+                    res.end(JSON.stringify({ error: 'PIN lama antum tidak sesuai' }));
+                    return;
+                  }
+
+                  const now = new Date();
+                  await sql`UPDATE musyrif SET pin = ${data.newPin}, "updatedAt" = ${now} WHERE id = ${data.musyrifId}`;
+                  res.end(JSON.stringify({ success: true, message: 'PIN berhasil diperbarui' }));
+                });
+                return;
+              }
+
               // 1. /api/musyrif
               if (pathname === '/api/musyrif') {
                 if (method === 'GET') {
@@ -143,6 +229,232 @@ export default defineConfig(({ mode }) => {
                   const id = url.searchParams.get('id');
                   if (id) {
                     await sql`DELETE FROM jadwal_tetap WHERE id = ${id}`;
+                  }
+                  res.end(JSON.stringify({ success: true }));
+                  return;
+                }
+              }
+
+              // 2b. /api/jadwal-bersama
+              if (pathname === '/api/jadwal-bersama') {
+                if (method === 'GET') {
+                  const rows = await sql`
+                    SELECT id, item, urutan, is_active as "isActive", created_at as "createdAt"
+                    FROM jadwal_bersama
+                    ORDER BY urutan ASC, created_at ASC
+                  `;
+                  res.end(JSON.stringify(rows));
+                  return;
+                }
+                if (method === 'POST') {
+                  let body = '';
+                  req.on('data', chunk => body += chunk);
+                  req.on('end', async () => {
+                    const data = JSON.parse(body || '{}');
+                    if (Array.isArray(data.items)) {
+                      await sql`DELETE FROM jadwal_bersama`;
+                      for (let i = 0; i < data.items.length; i++) {
+                        const it = data.items[i];
+                        const id = it.id || 'jb_' + (i + 1);
+                        const itemText = typeof it === 'string' ? it : it.item;
+                        const isActive = typeof it === 'object' && it.isActive !== undefined ? it.isActive : true;
+                        await sql`
+                          INSERT INTO jadwal_bersama (id, item, urutan, is_active)
+                          VALUES (${id}, ${itemText}, ${i + 1}, ${isActive})
+                        `;
+                      }
+                      const updated = await sql`SELECT id, item, urutan, is_active as "isActive" FROM jadwal_bersama ORDER BY urutan ASC`;
+                      res.end(JSON.stringify(updated));
+                      return;
+                    }
+                    if (data.item) {
+                      const id = 'jb_' + Math.random().toString(36).substring(2, 9);
+                      const countRes = await sql`SELECT COUNT(*) as count FROM jadwal_bersama`;
+                      const nextUrutan = (Number(countRes[0]?.count) || 0) + 1;
+                      const r = await sql`
+                        INSERT INTO jadwal_bersama (id, item, urutan, is_active)
+                        VALUES (${id}, ${data.item}, ${nextUrutan}, true)
+                        RETURNING id, item, urutan, is_active as "isActive"
+                      `;
+                      res.statusCode = 201;
+                      res.end(JSON.stringify(r[0]));
+                      return;
+                    }
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ error: 'Data tidak valid' }));
+                  });
+                  return;
+                }
+                if (method === 'DELETE') {
+                  const id = url.searchParams.get('id');
+                  if (id) {
+                    await sql`DELETE FROM jadwal_bersama WHERE id = ${id}`;
+                  }
+                  res.end(JSON.stringify({ success: true }));
+                  return;
+                }
+              }
+
+              // 2c. /api/jadwal-keseharian
+              if (pathname === '/api/jadwal-keseharian') {
+                if (method === 'GET') {
+                  const hari = url.searchParams.get('hari');
+                  const musyrifList = await sql`SELECT id, name, nickname, phone FROM musyrif ORDER BY name ASC`;
+                  const musyrifMap = new Map();
+                  musyrifList.forEach((m: any) => musyrifMap.set(m.id, m));
+
+                  let rows;
+                  if (hari) {
+                    const hariNum = parseInt(hari, 10);
+                    rows = await sql`
+                      SELECT id, hari, kategori, pos_name as "posName", petugas_ids as "petugasIds",
+                             petugas_custom as "petugasCustom", urutan, keterangan, created_at as "createdAt"
+                      FROM jadwal_keseharian
+                      WHERE hari = ${hariNum}
+                      ORDER BY urutan ASC, created_at ASC
+                    `;
+                  } else {
+                    rows = await sql`
+                      SELECT id, hari, kategori, pos_name as "posName", petugas_ids as "petugasIds",
+                             petugas_custom as "petugasCustom", urutan, keterangan, created_at as "createdAt"
+                      FROM jadwal_keseharian
+                      ORDER BY hari ASC, urutan ASC, created_at ASC
+                    `;
+                  }
+
+                  const formatted = rows.map((r: any) => {
+                    let ids: string[] = [];
+                    if (Array.isArray(r.petugasIds)) {
+                      ids = r.petugasIds;
+                    } else if (typeof r.petugasIds === 'string') {
+                      try { ids = JSON.parse(r.petugasIds); } catch { ids = r.petugasIds ? [r.petugasIds] : []; }
+                    }
+                    const petugasList = ids.map((id) => musyrifMap.get(id)).filter(Boolean);
+                    return {
+                      id: r.id,
+                      hari: r.hari,
+                      kategori: r.kategori,
+                      posName: r.posName,
+                      petugasIds: ids,
+                      petugasList,
+                      petugasCustom: r.petugasCustom || '',
+                      urutan: r.urutan,
+                      keterangan: r.keterangan,
+                    };
+                  });
+                  res.end(JSON.stringify(formatted));
+                  return;
+                }
+                if (method === 'POST') {
+                  let body = '';
+                  req.on('data', chunk => body += chunk);
+                  req.on('end', async () => {
+                    const data = JSON.parse(body || '{}');
+
+                    if (data.action === 'duplicate' && data.fromHari && data.toHari) {
+                      const source = await sql`
+                        SELECT kategori, pos_name, petugas_ids, petugas_custom, urutan, keterangan
+                        FROM jadwal_keseharian WHERE hari = ${data.fromHari} ORDER BY urutan ASC
+                      `;
+                      await sql`DELETE FROM jadwal_keseharian WHERE hari = ${data.toHari}`;
+                      for (let i = 0; i < source.length; i++) {
+                        const s = source[i];
+                        const newId = 'jk_' + data.toHari + '_' + (i + 1) + '_' + Math.random().toString(36).substring(2, 6);
+                        const idsJson = JSON.stringify(s.petugas_ids || []);
+                        await sql`
+                          INSERT INTO jadwal_keseharian (id, hari, kategori, pos_name, petugas_ids, petugas_custom, urutan, keterangan)
+                          VALUES (${newId}, ${data.toHari}, ${s.kategori}, ${s.pos_name}, ${idsJson}::jsonb, ${s.petugas_custom || ''}, ${s.urutan}, ${s.keterangan || null})
+                        `;
+                      }
+                      res.end(JSON.stringify({ success: true, count: source.length }));
+                      return;
+                    }
+
+                    if (data.action === 'init_preset' && data.hari) {
+                      const presets = [
+                        { kategori: 'UMUM', pos: 'masak nasi', urutan: 1 },
+                        { kategori: 'UMUM', pos: 'koordinator piket kel 2', urutan: 2 },
+                        { kategori: 'UMUM', pos: 'jaga gerbang pagi', urutan: 3 },
+                        { kategori: 'UMUM', pos: 'jaga sholat TK', urutan: 4 },
+                        { kategori: 'UMUM', pos: 'nganter santri', urutan: 5 },
+                        { kategori: 'SHOLAT', pos: 'subuh', urutan: 6 },
+                        { kategori: 'SHOLAT', pos: 'Dzuhur', urutan: 7 },
+                        { kategori: 'SHOLAT', pos: 'ashar', urutan: 8 },
+                        { kategori: 'SHOLAT', pos: 'Maghrib', urutan: 9 },
+                        { kategori: 'SHOLAT', pos: 'isya\'', urutan: 10 },
+                        { kategori: 'UMUM', pos: 'piket km musyrif', urutan: 11 },
+                      ];
+                      for (const p of presets) {
+                        const id = 'jk_' + data.hari + '_' + p.urutan + '_' + Math.random().toString(36).substring(2, 6);
+                        await sql`
+                          INSERT INTO jadwal_keseharian (id, hari, kategori, pos_name, petugas_ids, petugas_custom, urutan)
+                          VALUES (${id}, ${data.hari}, ${p.kategori}, ${p.pos}, '[]'::jsonb, '', ${p.urutan})
+                        `;
+                      }
+                      res.end(JSON.stringify({ success: true, count: presets.length }));
+                      return;
+                    }
+
+                    const hari = Number(data.hari);
+                    const kategori = data.kategori || 'UMUM';
+                    const posName = data.posName;
+                    const petugasIds = Array.isArray(data.petugasIds) ? data.petugasIds : [];
+                    const petugasCustom = data.petugasCustom || '';
+                    const urutan = Number(data.urutan) || 0;
+                    const keterangan = data.keterangan || null;
+                    const idsJson = JSON.stringify(petugasIds);
+
+                    if (data.id) {
+                      const now = new Date();
+                      await sql`
+                        UPDATE jadwal_keseharian
+                        SET hari = ${hari}, kategori = ${kategori}, pos_name = ${posName},
+                            petugas_ids = ${idsJson}::jsonb, petugas_custom = ${petugasCustom},
+                            urutan = ${urutan}, keterangan = ${keterangan}, updated_at = ${now}
+                        WHERE id = ${data.id}
+                      `;
+                      res.end(JSON.stringify({ success: true, id: data.id }));
+                      return;
+                    } else {
+                      const id = 'jk_' + hari + '_' + Math.random().toString(36).substring(2, 10);
+                      await sql`
+                        INSERT INTO jadwal_keseharian (id, hari, kategori, pos_name, petugas_ids, petugas_custom, urutan, keterangan)
+                        VALUES (${id}, ${hari}, ${kategori}, ${posName}, ${idsJson}::jsonb, ${petugasCustom}, ${urutan}, ${keterangan})
+                      `;
+                      res.statusCode = 201;
+                      res.end(JSON.stringify({ success: true, id }));
+                      return;
+                    }
+                  });
+                  return;
+                }
+                if (method === 'PATCH') {
+                  let body = '';
+                  req.on('data', chunk => body += chunk);
+                  req.on('end', async () => {
+                    const data = JSON.parse(body || '{}');
+                    if (!data.id) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ error: 'ID pos wajib' }));
+                      return;
+                    }
+                    const petugasIds = Array.isArray(data.petugasIds) ? data.petugasIds : [];
+                    const petugasCustom = data.petugasCustom !== undefined ? data.petugasCustom : '';
+                    const idsJson = JSON.stringify(petugasIds);
+                    const now = new Date();
+                    await sql`
+                      UPDATE jadwal_keseharian
+                      SET petugas_ids = ${idsJson}::jsonb, petugas_custom = ${petugasCustom}, updated_at = ${now}
+                      WHERE id = ${data.id}
+                    `;
+                    res.end(JSON.stringify({ success: true }));
+                  });
+                  return;
+                }
+                if (method === 'DELETE') {
+                  const id = url.searchParams.get('id');
+                  if (id) {
+                    await sql`DELETE FROM jadwal_keseharian WHERE id = ${id}`;
                   }
                   res.end(JSON.stringify({ success: true }));
                   return;
@@ -253,8 +565,40 @@ export default defineConfig(({ mode }) => {
                   req.on('end', async () => {
                     const data = JSON.parse(body || '{}');
                     const now = new Date();
-                    const newStatus = data.action === 'claim' ? 'CLAIMED' : 'ASSIGNED';
-                    const tipePenetapan = data.action === 'claim' ? 'SUKARELA' : 'PENUNJUKAN';
+
+                    if (data.action === 'unclaim') {
+                      const updated = await sql`
+                        UPDATE tugas_badal
+                        SET status = 'OPEN', "tipePenetapan" = NULL,
+                            "musyrifPenggantiId" = NULL, "claimedAt" = NULL, "updatedAt" = ${now}
+                        WHERE id = ${id} RETURNING *
+                      `;
+                      res.end(JSON.stringify(updated[0]));
+                      return;
+                    }
+
+                    if (data.action === 'cancel') {
+                      const updated = await sql`
+                        UPDATE tugas_badal
+                        SET status = 'CANCELLED', "updatedAt" = ${now}
+                        WHERE id = ${id} RETURNING *
+                      `;
+                      res.end(JSON.stringify(updated[0]));
+                      return;
+                    }
+
+                    if (data.action === 'complete') {
+                      const updated = await sql`
+                        UPDATE tugas_badal
+                        SET status = 'COMPLETED', "updatedAt" = ${now}
+                        WHERE id = ${id} RETURNING *
+                      `;
+                      res.end(JSON.stringify(updated[0]));
+                      return;
+                    }
+
+                    const newStatus = (data.action === 'claim') ? 'CLAIMED' : 'ASSIGNED';
+                    const tipePenetapan = (data.action === 'claim') ? 'SUKARELA' : 'PENUNJUKAN';
                     const updated = await sql`
                       UPDATE tugas_badal
                       SET status = ${newStatus}, "tipePenetapan" = ${tipePenetapan},
@@ -263,6 +607,12 @@ export default defineConfig(({ mode }) => {
                     `;
                     res.end(JSON.stringify(updated[0]));
                   });
+                  return;
+                }
+
+                if (method === 'DELETE') {
+                  await sql`DELETE FROM tugas_badal WHERE id = ${id}`;
+                  res.end(JSON.stringify({ success: true }));
                   return;
                 }
               }
@@ -354,6 +704,21 @@ export default defineConfig(({ mode }) => {
 
                 leaderboard.sort((a: any, b: any) => b.totalBulanIni - a.totalBulanIni);
                 res.end(JSON.stringify(leaderboard));
+                return;
+              }
+
+              if (pathname === '/api/rekap/reset' && method === 'POST') {
+                let body = '';
+                req.on('data', chunk => body += chunk);
+                req.on('end', async () => {
+                  const data = JSON.parse(body || '{}');
+                  if (data.onlyCompleted) {
+                    await sql`DELETE FROM tugas_badal WHERE status IN ('COMPLETED', 'CANCELLED')`;
+                  } else {
+                    await sql`DELETE FROM tugas_badal`;
+                  }
+                  res.end(JSON.stringify({ success: true, message: 'Data badal berhasil direset' }));
+                });
                 return;
               }
 

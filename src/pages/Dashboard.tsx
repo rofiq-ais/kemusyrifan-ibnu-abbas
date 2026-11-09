@@ -21,12 +21,15 @@ import {
   deleteJadwal,
   assignBadal,
   fetchFairnessRecommendations,
+  fetchJadwalBersama,
+  fetchJadwalKeseharian,
 } from '../api/client';
 import {
   formatIndonesianDate,
   generateWaLink,
   getIndonesianDayNumber,
   HARI_NAMES,
+  generateFormatWaKetua,
 } from '../lib/dateUtils';
 import {
   Plus,
@@ -43,13 +46,17 @@ import {
   BellRing,
   AlertTriangle,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
+  const { user, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [jadwal, setJadwal] = useState<any[]>([]);
   const [musyrif, setMusyrif] = useState<any[]>([]);
   const [tugasBadal, setTugasBadal] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [keseharianAll, setKeseharianAll] = useState<any[]>([]);
+  const [bersamaAll, setBersamaAll] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Responsive Drawer & Desktop Sidebar State
@@ -94,16 +101,20 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [jData, mData, bData, rData] = await Promise.all([
+      const [jData, mData, bData, rData, kData, bmData] = await Promise.all([
         fetchJadwal(),
         fetchMusyrif(),
         fetchBadalList(),
         fetchRekapLeaderboard(),
+        fetchJadwalKeseharian(),
+        fetchJadwalBersama(),
       ]);
       setJadwal(jData);
       setMusyrif(mData);
       setTugasBadal(bData);
       setLeaderboard(rData);
+      setKeseharianAll(kData || []);
+      setBersamaAll(bmData || []);
 
       if (mData.length > 0 && !jadwalFormData.musyrifId) {
         setJadwalFormData((prev) => ({ ...prev, musyrifId: mData[0].id }));
@@ -214,17 +225,69 @@ export default function Dashboard() {
     return text;
   };
 
-  // Generate Daily Schedule WA Broadcast text
+  // Generate Daily Schedule WA Broadcast text (Format Asli Ketua)
   const generateDailyScheduleWaText = (targetHari: number) => {
     const hariName = HARI_NAMES[targetHari] || 'Hari Ini';
+    const targetKeseharian = keseharianAll.filter((k: any) => k.hari === targetHari);
+
+    if (targetKeseharian.length > 0) {
+      const posSholat = targetKeseharian.filter(
+        (p: any) =>
+          p.kategori === 'SHOLAT' ||
+          ['subuh', 'dzuhur', 'ashar', 'maghrib', "isya'", 'isya'].includes(
+            p.posName.toLowerCase().trim()
+          )
+      );
+      const posNonSholat = targetKeseharian.filter(
+        (p: any) => !posSholat.some((s: any) => s.id === p.id)
+      );
+      const posUmumBeforeSholat = posNonSholat.filter(
+        (p: any) => !p.posName.toLowerCase().includes('km musyrif')
+      );
+      const posUmumAfterSholat = posNonSholat.filter((p: any) =>
+        p.posName.toLowerCase().includes('km musyrif')
+      );
+
+      const getDisplay = (item: any) => {
+        if (item.petugasCustom && item.petugasCustom.trim()) return item.petugasCustom.trim();
+        if (item.petugasList && item.petugasList.length > 0) {
+          return item.petugasList
+            .map((p: any) => p.nickname || p.name.replace(/^Ami\s+/i, ''))
+            .join(' & ');
+        }
+        return '-';
+      };
+
+      const activeBersama =
+        bersamaAll.length > 0
+          ? bersamaAll.filter((b: any) => b.isActive).map((b: any) => b.item)
+          : undefined;
+
+      return generateFormatWaKetua({
+        hariName,
+        jadwalBersama: activeBersama,
+        posUmumBeforeSholat: posUmumBeforeSholat.map((b: any) => ({
+          posName: b.posName,
+          petugasDisplay: getDisplay(b),
+        })),
+        posSholat: posSholat.map((s: any) => ({
+          waktu: s.posName,
+          petugasDisplay: getDisplay(s),
+        })),
+        posUmumAfterSholat: posUmumAfterSholat.map((a: any) => ({
+          posName: a.posName,
+          petugasDisplay: getDisplay(a),
+        })),
+      });
+    }
+
     const dateStr = formatIndonesianDate(new Date());
     const dayJadwal = jadwal
       .filter((j) => j.hari === targetHari)
       .sort((a, b) => a.jamMulai.localeCompare(b.jamMulai));
 
-    let text = `*JADWAL DAN KESEHARIAN MUSYRIF - ${hariName.toUpperCase()}*\n`;
-    text += `📅 ${dateStr}\n`;
-    text += `🏛️ _Pondok Pesantren • Ketertiban & Keadilan_\n\n`;
+    let text = `🗓️*HARI ${hariName.toUpperCase()}*\n\n`;
+    text += `*JADWAL MUSYRIF*\n📅 ${dateStr}\n\n`;
 
     if (dayJadwal.length === 0) {
       text += `Belum ada agenda jadwal tetap yang terdaftar untuk hari ${hariName}.\n\n`;
@@ -235,25 +298,10 @@ export default function Dashboard() {
         text += `   📌 *${item.kegiatan}*\n`;
         text += `   👤 Ustadz: *${item.musyrif?.name || 'Musyrif'}*\n`;
         if (item.lokasi) text += `   📍 Lokasi: ${item.lokasi}\n`;
-        if (item.keterangan) text += `   📝 Ket: ${item.keterangan}\n`;
         text += `\n`;
       });
     }
-
-    // Check if there are open badal tickets today
-    const openBadalToday = tugasBadal.filter(
-      (t) => t.status === 'OPEN'
-    );
-
-    if (openBadalToday.length > 0) {
-      text += `⚠️ *PERHATIAN: Ada ${openBadalToday.length} tugas yang BUTUH BADAL!*\n`;
-      openBadalToday.forEach((t, i) => {
-        text += `   • ${t.judul} (${t.jamMulai} - ${t.jamSelesai})\n`;
-      });
-      text += `Mohon asatidzah yang luang untuk segera mengklaim di aplikasi.\n\n`;
-    }
-
-    text += `Semoga Allah Ta'ala melimpahkan kelancaran, keikhlasan, dan keberkahan dalam tugas antum sekalian. Barakallahu fiikum.`;
+    text += `*DI MOHON UNTUK KERJASAMANYA YA AM....🙏🏻*\n\nYassarollohulana umuurona 🤲🏻\nJazakumullohokhoiron katsiron`;
     return text;
   };
 
@@ -274,7 +322,7 @@ export default function Dashboard() {
         isCollapsed={isDesktopSidebarCollapsed}
         onToggleCollapse={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
         onOpenCreateBadal={() => setShowCreateBadalModal(true)}
-        onOpenCreateJadwal={() => setShowCreateJadwalModal(true)}
+        onOpenCreateJadwal={isAdmin ? () => setShowCreateJadwalModal(true) : undefined}
         activeMusyrifCount={musyrif.length}
       />
 
@@ -402,7 +450,7 @@ export default function Dashboard() {
 
               {/* TAB 4: REKAP POIN & PAPAN KEADILAN */}
               {activeTab === 'rekap' && (
-                <RekapPoinTab leaderboard={leaderboard} />
+                <RekapPoinTab leaderboard={leaderboard} onRefresh={loadData} />
               )}
 
               {/* TAB 5: DATA MUSYRIF */}

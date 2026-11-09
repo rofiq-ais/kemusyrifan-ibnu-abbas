@@ -13,6 +13,7 @@ model Musyrif {
   nickname  String?
   phone     String?  // Format: 628xxxxxxxxxx
   role      String   @default("MUSYRIF") // "ADMIN" atau "MUSYRIF"
+  pin       String   @default("123456")  // 6 digit PIN untuk login
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -81,4 +82,29 @@ model TugasBadal {
   @@index([tanggal])
   @@index([status])
   @@map("tugas_badal")
+}
+
+model JadwalBersama {
+  id        String    @id
+  item      String
+  urutan    Int?      @default(0)
+  isActive  Boolean?  @default(true) @map("is_active")
+  createdAt DateTime? @default(now()) @map("created_at")
+
+  @@map("jadwal_bersama")
+}
+
+model JadwalKeseharian {
+  id            String    @id
+  hari          Int
+  kategori      String
+  posName       String    @map("pos_name")
+  petugasIds    Json?     @default("[]") @map("petugas_ids")
+  petugasCustom String?   @default("") @map("petugas_custom")
+  urutan        Int?      @default(0)
+  keterangan    String?
+  createdAt     DateTime? @default(now()) @map("created_at")
+  updatedAt     DateTime? @default(now()) @updatedAt @map("updated_at")
+
+  @@map("jadwal_keseharian")
 }

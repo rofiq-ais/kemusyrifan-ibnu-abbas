@@ -54,9 +54,39 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const sql = getDb(context.env);
     const id = context.params.id as string;
     const body = (await context.request.json()) as {
-      action: 'claim' | 'assign';
-      musyrifId: string;
+      action: 'claim' | 'assign' | 'unclaim' | 'reassign' | 'cancel' | 'complete';
+      musyrifId?: string;
     };
+
+    const now = new Date();
+
+    if (body.action === 'unclaim') {
+      const updated = await sql`
+        UPDATE tugas_badal
+        SET status = 'OPEN', "tipePenetapan" = NULL,
+            "musyrifPenggantiId" = NULL, "claimedAt" = NULL, "updatedAt" = ${now}
+        WHERE id = ${id} RETURNING *
+      `;
+      return jsonResponse(updated[0]);
+    }
+
+    if (body.action === 'cancel') {
+      const updated = await sql`
+        UPDATE tugas_badal
+        SET status = 'CANCELLED', "updatedAt" = ${now}
+        WHERE id = ${id} RETURNING *
+      `;
+      return jsonResponse(updated[0]);
+    }
+
+    if (body.action === 'complete') {
+      const updated = await sql`
+        UPDATE tugas_badal
+        SET status = 'COMPLETED', "updatedAt" = ${now}
+        WHERE id = ${id} RETURNING *
+      `;
+      return jsonResponse(updated[0]);
+    }
 
     if (!body.musyrifId) {
       return errorResponse('Pilih musyrif pengganti');
@@ -75,9 +105,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       return errorResponse('Tugas ini sudah diambil oleh musyrif lain');
     }
 
-    const now = new Date();
-    const newStatus = body.action === 'claim' ? 'CLAIMED' : 'ASSIGNED';
-    const tipePenetapan = body.action === 'claim' ? 'SUKARELA' : 'PENUNJUKAN';
+    const newStatus = (body.action === 'claim') ? 'CLAIMED' : 'ASSIGNED';
+    const tipePenetapan = (body.action === 'claim') ? 'SUKARELA' : 'PENUNJUKAN';
 
     const updated = await sql`
       UPDATE tugas_badal
@@ -97,3 +126,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return errorResponse(message, 500);
   }
 };
+
+export const onRequestDelete: PagesFunction<Env> = async (context) => {
+  try {
+    const sql = getDb(context.env);
+    const id = context.params.id as string;
+    await sql`DELETE FROM tugas_badal WHERE id = ${id}`;
+    return jsonResponse({ success: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Database error';
+    return errorResponse(message, 500);
+  }
+};
+

@@ -95,19 +95,13 @@ export default function Navbar({
             </div>
           </div>
 
-          {/* Right: Date, Kirim WA, Badal Alert, Quick Action, Refresh */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Live Date Badge (Desktop only) */}
-            <div className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/90 text-slate-700 text-xs font-semibold border border-slate-200/60">
-              <Calendar className="w-3.5 h-3.5 text-slate-500" />
-              <span>{todayFormatted}</span>
-            </div>
-
-            {/* Tombol Kirim Pengingat WA */}
+          {/* Right: Kirim WA, Badal Alert, Refresh */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Tombol Kirim Pengingat WA (Utama) */}
             {onOpenSendWaReminder && (
               <button
                 onClick={onOpenSendWaReminder}
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 shrink-0"
                 title="Kirim Pengingat Jadwal Hari Ini ke Grup WhatsApp"
               >
                 <Send className="w-3.5 h-3.5" />
@@ -120,7 +114,7 @@ export default function Navbar({
             {openBadalCount > 0 ? (
               <button
                 onClick={() => setActiveTab('badal')}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-xs transition-all active:scale-95 animate-pulse shrink-0"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-xs transition-all active:scale-95 shrink-0"
                 title={`${openBadalCount} tugas butuh pengganti`}
               >
                 <Bell className="w-3.5 h-3.5 fill-stone-950" />
@@ -134,23 +128,12 @@ export default function Navbar({
               </div>
             )}
 
-            {/* Quick Create Badal Button */}
-            {onOpenCreateBadal && (
-              <button
-                onClick={onOpenCreateBadal}
-                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-xs transition-all active:scale-95 shrink-0"
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span>+ Buat Badal</span>
-              </button>
-            )}
-
             {/* Refresh Data Button */}
             {onRefreshData && (
               <button
                 onClick={onRefreshData}
                 title="Segarkan Data"
-                className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>

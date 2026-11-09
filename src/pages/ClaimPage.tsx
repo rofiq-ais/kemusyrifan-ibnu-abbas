@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { fetchSingleBadal, fetchMusyrif, claimBadal } from '../api/client';
+import { fetchSingleBadal, fetchMusyrif, claimBadal, unclaimBadal } from '../api/client';
 import { formatIndonesianDate } from '../lib/dateUtils';
-import { Clock, MapPin, MoonStar, CheckCircle2, UserCheck, AlertCircle } from 'lucide-react';
+import { Clock, MapPin, MoonStar, CheckCircle2, UserCheck, AlertCircle, Undo2, ArrowLeft } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function ClaimPage() {
   const { id } = useParams<{ id: string }>();
+  const { user, isAdmin } = useAuth();
   const [tugas, setTugas] = useState<any | null>(null);
   const [musyrifList, setMusyrifList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,9 @@ export default function ClaimPage() {
       ]);
       setTugas(tData);
       setMusyrifList(mData);
+      if (user && user.id !== tData.musyrifAsliId) {
+        setSelectedMusyrifId(user.id);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal memuat detail tugas');
     } finally {
@@ -33,7 +38,7 @@ export default function ClaimPage() {
 
   useEffect(() => {
     loadDetail();
-  }, [id]);
+  }, [id, user]);
 
   const handleClaim = async () => {
     if (!selectedMusyrifId || !id) {
@@ -185,7 +190,7 @@ export default function ClaimPage() {
             {/* Action / Result */}
             <div className="pt-2">
               {isAlreadyClaimed ? (
-                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-5 text-center space-y-2">
+                <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-5 text-center space-y-3">
                   <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
                   <h3 className="font-bold text-emerald-950 text-base">Alhamdulillah, Tugas Sudah Terisi!</h3>
                   <p className="text-xs text-emerald-800">
@@ -194,29 +199,77 @@ export default function ClaimPage() {
                   <p className="text-[11px] text-emerald-600 italic">
                     Jazakumullah khairan katsiran atas kesediaannya membantu sesama asatidzah.
                   </p>
+
+                  {/* Tombol Batal Klaim jika berhalangan mendadak */}
+                  {(isAdmin || (user && user.id === tugas.musyrifPenggantiId)) && (
+                    <div className="pt-3 border-t border-emerald-200/80 space-y-2">
+                      <p className="text-[11px] text-amber-800 font-medium">
+                        Berhalangan mendadak dan tidak jadi menggantikan tugas ini?
+                      </p>
+                      <button
+                        type="button"
+                        disabled={submitting}
+                        onClick={async () => {
+                          if (confirm('Apakah antum yakin ingin membatalkan klaim tugas ini dan membukanya kembali di Bursa Badal?')) {
+                            setSubmitting(true);
+                            try {
+                              await unclaimBadal(tugas.id);
+                              setIsSuccess(false);
+                              await loadDetail();
+                            } catch (e: any) {
+                              alert(e.message || 'Gagal membatalkan klaim');
+                            } finally {
+                              setSubmitting(false);
+                            }
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 font-extrabold text-xs shadow-xs transition"
+                      >
+                        <Undo2 className="w-3.5 h-3.5" />
+                        <span>Batalkan Klaim (Buka Kembali ke Bursa)</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
-                      Pilih Nama Antum:
-                    </label>
-                    <select
-                      value={selectedMusyrifId}
-                      onChange={(e) => {
-                        setSelectedMusyrifId(e.target.value);
-                        setErrorMsg(null);
-                      }}
-                      className="w-full px-4 py-3 rounded-2xl border-2 border-stone-300 bg-white text-stone-800 text-sm font-semibold focus:border-emerald-600 focus:outline-hidden transition"
-                    >
-                      <option value="">-- Pilih Nama Pengganti (Antum) --</option>
-                      {eligibleMusyrif.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {user ? (
+                    <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                          {user.name.slice(0, 2)}
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-emerald-700 font-semibold">Antum Masuk Sebagai:</div>
+                          <div className="text-sm font-bold text-emerald-950">{user.name}</div>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                        Siap Mengambil
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
+                        Pilih Nama Antum:
+                      </label>
+                      <select
+                        value={selectedMusyrifId}
+                        onChange={(e) => {
+                          setSelectedMusyrifId(e.target.value);
+                          setErrorMsg(null);
+                        }}
+                        className="w-full px-4 py-3 rounded-2xl border-2 border-stone-300 bg-white text-stone-800 text-sm font-semibold focus:border-emerald-600 focus:outline-hidden transition"
+                      >
+                        <option value="">-- Pilih Nama Pengganti (Antum) --</option>
+                        {eligibleMusyrif.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {errorMsg && (
                     <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">

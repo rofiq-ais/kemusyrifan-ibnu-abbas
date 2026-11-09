@@ -40,8 +40,8 @@ async function main() {
     {
       name: 'Ami Fariz',
       nickname: 'Fariz',
-      role: 'MUSYRIF',
-      phone: '',
+      role: 'ADMIN',
+      phone: '081390072095',
     },
   ];
 

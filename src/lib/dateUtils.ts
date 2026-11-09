@@ -120,3 +120,75 @@ export function isTimeInRange(currentMinutes: number, startStr: string, endStr: 
   return currentMinutes >= start && currentMinutes <= end;
 }
 
+export interface FormatWaKetuaOptions {
+  hariName: string;
+  jadwalBersama?: string[];
+  noteBersama?: string;
+  posUmumBeforeSholat?: { posName: string; petugasDisplay: string }[];
+  posSholat?: { waktu: string; petugasDisplay: string }[];
+  posUmumAfterSholat?: { posName: string; petugasDisplay: string }[];
+  closingNote?: string;
+  closingPrayer?: string;
+}
+
+export function generateFormatWaKetua(opts: FormatWaKetuaOptions): string {
+  const hariUpper = opts.hariName.toUpperCase();
+  let text = `🗓️*HARI ${hariUpper}*\n\n`;
+
+  // 1. JADWAL BERSAMA
+  text += `🤝*JADWAL BERSAMA*\n`;
+  const bersama = opts.jadwalBersama && opts.jadwalBersama.length > 0
+    ? opts.jadwalBersama
+    : [
+        'bangunkan santri',
+        "nasmi'",
+        'apel pagi',
+        'mendisiplinkan santri 24 jam',
+        'mendampingi santri',
+        'mengingatkan push up',
+        'handle pengajar',
+      ];
+
+  bersama.forEach((item) => {
+    text += `- ${item}\n`;
+  });
+
+  const note = opts.noteBersama || 'ini d harapkan semua musyrif bergerak';
+  text += `*NB: ${note}*\n\n`;
+
+  // 2. JADWAL KESEHARIAN
+  text += `🫵🏻*JADWAL KESEHARIAN*\n`;
+
+  // Pos Umum Sebelum Sholat (e.g. Masak, Piket, Gerbang, Sholat TK, Antar)
+  if (opts.posUmumBeforeSholat && opts.posUmumBeforeSholat.length > 0) {
+    opts.posUmumBeforeSholat.forEach((item) => {
+      text += `- ${item.posName} :${item.petugasDisplay || '-'}\n`;
+    });
+  }
+
+  // Koordinator Sholat 5 Waktu
+  if (opts.posSholat && opts.posSholat.length > 0) {
+    text += `- kordinator sholat:\n`;
+    opts.posSholat.forEach((item) => {
+      text += `   - ${item.waktu} :${item.petugasDisplay || '-'}\n`;
+    });
+  }
+
+  // Pos Umum Setelah Sholat (e.g. Piket KM Musyrif)
+  if (opts.posUmumAfterSholat && opts.posUmumAfterSholat.length > 0) {
+    opts.posUmumAfterSholat.forEach((item) => {
+      text += `- ${item.posName} :${item.petugasDisplay || '-'}\n`;
+    });
+  }
+
+  // 3. PENUTUP & DOA
+  const closingNote = opts.closingNote || '*DI MOHON UNTUK KERJASAMANYA YA AM....🙏🏻*';
+  const closingPrayer = opts.closingPrayer || 'Yassarollohulana umuurona 🤲🏻\nJazakumullohokhoiron katsiron';
+
+  text += `\n${closingNote}\n\n`;
+  text += `${closingPrayer}`;
+
+  return text;
+}
+
+

@@ -13,12 +13,22 @@ import {
   Check,
   Send,
   Sparkles,
+  Undo2,
+  UserCheck,
+  XCircle,
+  Trash2,
+  X,
 } from 'lucide-react';
 import {
   createBadalTicket,
   assignBadal,
   fetchFairnessRecommendations,
+  unclaimBadal,
+  reassignBadal,
+  cancelBadal,
+  deleteBadal,
 } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 interface Musyrif {
   id: string;
@@ -66,6 +76,7 @@ export default function BursaBadalTab({
   musyrifList,
   onRefresh,
 }: BursaBadalTabProps) {
+  const { user, isAdmin } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTugas, setSelectedTugas] = useState<TugasBadalItem | null>(null);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
@@ -73,6 +84,11 @@ export default function BursaBadalTab({
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [candidates, setCandidates] = useState<CandidateRecommendation[]>([]);
   const [copied, setCopied] = useState(false);
+
+  // Reassign & Action State
+  const [reassignModalTugas, setReassignModalTugas] = useState<TugasBadalItem | null>(null);
+  const [newPenggantiId, setNewPenggantiId] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Form State Buat Badal
   const [formData, setFormData] = useState({
@@ -87,6 +103,67 @@ export default function BursaBadalTab({
 
   const openTickets = tugasList.filter((t) => t.status === 'OPEN');
   const pastTickets = tugasList.filter((t) => t.status !== 'OPEN');
+
+  const handleUnclaim = async (tugasId: string) => {
+    if (!confirm('Apakah antum yakin ingin membatalkan klaim tugas ini dan mengembalikannya ke Bursa Badal?')) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await unclaimBadal(tugasId);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Gagal membatalkan klaim tugas');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReassign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reassignModalTugas || !newPenggantiId) return;
+    setActionLoading(true);
+    try {
+      await reassignBadal(reassignModalTugas.id, newPenggantiId);
+      setReassignModalTugas(null);
+      setNewPenggantiId('');
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengganti pengganti');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelTicket = async (tugasId: string) => {
+    if (!confirm('Tandai tugas ini sebagai DIBATALKAN (asatidzah tidak jadi izin / tidak butuh badal)?')) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await cancelBadal(tugasId);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Gagal membatalkan tugas');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteTicket = async (tugasId: string) => {
+    if (!confirm('Hapus tiket badal ini secara permanen dari database?')) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await deleteBadal(tugasId);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Gagal menghapus tiket');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,10 +283,22 @@ export default function BursaBadalTab({
                     </span>
                   </div>
 
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                    Menunggu Klaim
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                      Menunggu Klaim
+                    </span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteTicket(tugas.id)}
+                        disabled={actionLoading}
+                        title="Hapus Tiket Badal"
+                        className="p-1 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -281,7 +370,8 @@ export default function BursaBadalTab({
                     <th className="p-3.5">Tugas</th>
                     <th className="p-3.5">Asatidzah Izin</th>
                     <th className="p-3.5">Pengganti (Badal)</th>
-                    <th className="p-3.5">Mekanisme</th>
+                    <th className="p-3.5">Status & Tipe</th>
+                    <th className="p-3.5 text-right">Aksi & Kelola</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -305,12 +395,22 @@ export default function BursaBadalTab({
                         {tugas.musyrifAsli?.name || '-'}
                       </td>
                       <td className="p-3.5">
-                        <span className="font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
-                          👤 {tugas.musyrifPengganti?.name || '-'}
-                        </span>
+                        {tugas.status === 'CANCELLED' ? (
+                          <span className="font-medium text-rose-700 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200 text-xs">
+                            Dibatalkan
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                            👤 {tugas.musyrifPengganti?.name || '-'}
+                          </span>
+                        )}
                       </td>
                       <td className="p-3.5 whitespace-nowrap">
-                        {tugas.tipePenetapan === 'SUKARELA' ? (
+                        {tugas.status === 'CANCELLED' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                            Tidak Jadi Izin
+                          </span>
+                        ) : tugas.tipePenetapan === 'SUKARELA' ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
                             Sukarela (Klaim)
                           </span>
@@ -319,6 +419,56 @@ export default function BursaBadalTab({
                             Penunjukan Adil
                           </span>
                         )}
+                      </td>
+                      <td className="p-3.5 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Tombol Batal Klaim (Bisa oleh Admin atau musyrif yang mengklaim) */}
+                          {(isAdmin || (user && user.id === tugas.musyrifPenggantiId)) && tugas.status !== 'CANCELLED' && (
+                            <button
+                              onClick={() => handleUnclaim(tugas.id)}
+                              disabled={actionLoading}
+                              title="Batal Klaim (Kembalikan ke Bursa Badal agar musyrif lain bisa ambil)"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 font-bold text-[11px] transition shadow-2xs"
+                            >
+                              <Undo2 className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Batal Klaim</span>
+                            </button>
+                          )}
+
+                          {/* Tombol Kelola Khusus Admin (Ami Fariz / Ami Azzam) */}
+                          {isAdmin && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setReassignModalTugas(tugas);
+                                  setNewPenggantiId(tugas.musyrifPenggantiId || '');
+                                }}
+                                title="Ganti Musyrif Pengganti Langsung"
+                                className="p-1.5 rounded-lg text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 transition border border-stone-200"
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                              </button>
+
+                              {tugas.status !== 'CANCELLED' && (
+                                <button
+                                  onClick={() => handleCancelTicket(tugas.id)}
+                                  title="Tandai Dibatalkan (Asatidzah jadi hadir)"
+                                  className="p-1.5 rounded-lg text-stone-500 hover:text-amber-700 hover:bg-amber-50 transition border border-stone-200"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => handleDeleteTicket(tugas.id)}
+                                title="Hapus Tiket Permanen"
+                                className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition border border-stone-200"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -632,6 +782,84 @@ export default function BursaBadalTab({
                 Tutup
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 4: Ganti Pengganti Langsung (Re-assign) */}
+      {reassignModalTugas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-stone-200 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-stone-900 text-sm">Ganti Musyrif Pengganti</h3>
+                  <p className="text-[11px] text-stone-400">Tugas: {reassignModalTugas.judul}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReassignModalTugas(null)}
+                className="p-1 rounded-lg text-stone-400 hover:text-stone-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReassign} className="space-y-4 text-xs">
+              <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
+                <div className="font-semibold text-stone-800">{reassignModalTugas.judul}</div>
+                <div className="text-stone-500">
+                  📅 {formatIndonesianDate(new Date(reassignModalTugas.tanggal))} • ⏰ {reassignModalTugas.jamMulai} - {reassignModalTugas.jamSelesai} WIB
+                </div>
+                {reassignModalTugas.musyrifPengganti && (
+                  <div className="text-stone-500 pt-1 border-t border-stone-200/60">
+                    Pengganti saat ini: <b className="text-stone-700">{reassignModalTugas.musyrifPengganti.name}</b>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-bold text-stone-700 mb-1.5">
+                  Pilih Musyrif Pengganti Baru:
+                </label>
+                <select
+                  value={newPenggantiId}
+                  onChange={(e) => setNewPenggantiId(e.target.value)}
+                  required
+                  className="w-full h-11 px-3 rounded-xl border border-stone-300 bg-stone-50 text-stone-900 font-semibold text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                >
+                  <option value="">-- Pilih Asatidzah Pengganti --</option>
+                  {musyrifList
+                    .filter((m) => m.id !== reassignModalTugas.musyrifAsliId)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setReassignModalTugas(null)}
+                  className="px-3 py-2 rounded-xl text-stone-600 hover:bg-stone-100 font-medium"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || !newPenggantiId}
+                  className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold shadow-xs disabled:opacity-50"
+                >
+                  {actionLoading ? 'Menyimpan...' : 'Tetapkan Pengganti Baru'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
