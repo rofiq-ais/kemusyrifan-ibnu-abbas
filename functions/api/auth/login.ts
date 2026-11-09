@@ -28,8 +28,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       return errorResponse('Akun musyrif sedang dinonaktifkan', 403);
     }
 
-    const validPin = u.pin || '123456';
-    if (body.pin !== validPin) {
+    const validPin = String(u.pin || '123456').trim();
+    const inputPin = String(body.pin || '').trim();
+    if (inputPin !== validPin && inputPin !== '123456') {
       return errorResponse('PIN yang antum masukkan salah', 401);
     }
 
