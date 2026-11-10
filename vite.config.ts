@@ -221,9 +221,10 @@ export default defineConfig(({ mode }) => {
                     const data = JSON.parse(body || '{}');
                     const id = 'c' + Math.random().toString(36).substring(2, 12);
                     const now = new Date();
+                    const hari = Number(data.hari) || 1;
                     const result = await sql`
                       INSERT INTO jadwal_tetap (id, hari, "jamMulai", "jamSelesai", kegiatan, lokasi, keterangan, "musyrifId", "createdAt", "updatedAt")
-                      VALUES (${id}, ${data.hari}, ${data.jamMulai}, ${data.jamSelesai}, ${data.kegiatan}, ${data.lokasi || null}, ${data.keterangan || null}, ${data.musyrifId}, ${now}, ${now})
+                      VALUES (${id}, ${hari}, ${data.jamMulai}, ${data.jamSelesai}, ${data.kegiatan}, ${data.lokasi || null}, ${data.keterangan || null}, ${data.musyrifId}, ${now}, ${now})
                       RETURNING *
                     `;
                     res.statusCode = 201;

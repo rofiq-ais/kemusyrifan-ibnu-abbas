@@ -1,8 +1,9 @@
-import { Env, getDb, jsonResponse, errorResponse } from './_db';
+import { Env, getDb, jsonResponse, errorResponse, ensureTables } from './_db';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
     const sql = getDb(context.env);
+    await ensureTables(sql);
     const rows = await sql`
       SELECT id, item, urutan, is_active as "isActive", created_at as "createdAt"
       FROM jadwal_bersama
@@ -18,6 +19,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const sql = getDb(context.env);
+    await ensureTables(sql);
     const body = (await context.request.json()) as any;
 
     // Batch update / replace items

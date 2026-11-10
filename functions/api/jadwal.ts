@@ -1,8 +1,9 @@
-import { Env, getDb, jsonResponse, errorResponse } from './_db';
+import { Env, getDb, jsonResponse, errorResponse, ensureTables } from './_db';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
     const sql = getDb(context.env);
+    await ensureTables(sql);
     const url = new URL(context.request.url);
     const hari = url.searchParams.get('hari');
 
@@ -55,8 +56,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const sql = getDb(context.env);
+    await ensureTables(sql);
     const body = (await context.request.json()) as {
-      hari: number;
+      hari: number | string;
       jamMulai: string;
       jamSelesai: string;
       kegiatan: string;
@@ -69,12 +71,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       return errorResponse('Lengkapi semua data jadwal');
     }
 
+    const hari = Number(body.hari) || 1;
     const id = 'c' + Math.random().toString(36).substring(2, 12);
     const now = new Date();
 
     const result = await sql`
       INSERT INTO jadwal_tetap (id, hari, "jamMulai", "jamSelesai", kegiatan, lokasi, keterangan, "musyrifId", "createdAt", "updatedAt")
-      VALUES (${id}, ${body.hari}, ${body.jamMulai}, ${body.jamSelesai}, ${body.kegiatan}, ${body.lokasi || null}, ${body.keterangan || null}, ${body.musyrifId}, ${now}, ${now})
+      VALUES (${id}, ${hari}, ${body.jamMulai}, ${body.jamSelesai}, ${body.kegiatan}, ${body.lokasi || null}, ${body.keterangan || null}, ${body.musyrifId}, ${now}, ${now})
       RETURNING *
     `;
 

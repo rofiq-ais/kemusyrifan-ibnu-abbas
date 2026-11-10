@@ -141,8 +141,8 @@ export default function Dashboard() {
       await createBadalTicket(badalFormData);
       setShowCreateBadalModal(false);
       loadData();
-    } catch (err) {
-      alert('Gagal membuat tiket badal');
+    } catch (err: any) {
+      alert(err.message || 'Gagal membuat tiket badal');
     }
   };
 
@@ -160,16 +160,20 @@ export default function Dashboard() {
       });
       setShowCreateJadwalModal(false);
       loadData();
-    } catch (err) {
-      alert('Gagal menambah jadwal');
+    } catch (err: any) {
+      alert(err.message || 'Gagal menambah jadwal');
     }
   };
 
   // Handle Delete Jadwal
   const handleDeleteJadwal = async (id: string) => {
     if (confirm('Apakah antum yakin ingin menghapus jadwal ini?')) {
-      await deleteJadwal(id);
-      loadData();
+      try {
+        await deleteJadwal(id);
+        loadData();
+      } catch (err: any) {
+        alert(err.message || 'Gagal menghapus jadwal');
+      }
     }
   };
 

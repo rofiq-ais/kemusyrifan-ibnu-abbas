@@ -287,8 +287,12 @@ export default function JadwalHarianTab({
   // Delete Pos
   const handleDeletePos = async (id: string, name: string) => {
     if (confirm(`Hapus pos tugas "${name}"?`)) {
-      await deleteJadwalKeseharianPos(id);
-      loadKeseharianData(selectedHari);
+      try {
+        await deleteJadwalKeseharianPos(id);
+        loadKeseharianData(selectedHari);
+      } catch (err: any) {
+        alert(err.message || 'Gagal menghapus pos tugas');
+      }
     }
   };
 
@@ -299,8 +303,12 @@ export default function JadwalHarianTab({
         `Muat template pos standar untuk Hari ${HARI_NAMES[selectedHari]}? (Masak nasi, Sholat 5 Waktu, Piket, Gerbang, dll.)`
       )
     ) {
-      await initPresetJadwalKeseharian(selectedHari);
-      loadKeseharianData(selectedHari);
+      try {
+        await initPresetJadwalKeseharian(selectedHari);
+        loadKeseharianData(selectedHari);
+      } catch (err: any) {
+        alert(err.message || 'Gagal memuat template pos tugas');
+      }
     }
   };
 
@@ -313,8 +321,8 @@ export default function JadwalHarianTab({
         `Jadwal Hari ${HARI_NAMES[selectedHari]} berhasil disalin ke Hari ${HARI_NAMES[duplicateTargetHari]}!`
       );
       setSelectedHari(duplicateTargetHari);
-    } catch (err) {
-      alert('Gagal menduplikasi jadwal');
+    } catch (err: any) {
+      alert(err.message || 'Gagal menduplikasi jadwal');
     }
   };
 
@@ -344,8 +352,8 @@ export default function JadwalHarianTab({
         keterangan: '',
       });
       loadKeseharianData(selectedHari);
-    } catch (err) {
-      alert('Gagal menambah pos tugas');
+    } catch (err: any) {
+      alert(err.message || 'Gagal menambah pos tugas');
     }
   };
 
@@ -400,8 +408,8 @@ export default function JadwalHarianTab({
         `Tiket Badal untuk pos "${badalPosSource.posName}" berhasil diterbitkan ke Bursa Badal!`
       );
       onRefresh();
-    } catch (err) {
-      alert('Gagal menerbitkan tiket badal');
+    } catch (err: any) {
+      alert(err.message || 'Gagal menerbitkan tiket badal');
     }
   };
 
@@ -411,8 +419,8 @@ export default function JadwalHarianTab({
       await saveJadwalBersama(bersamaDraft);
       setShowEditBersamaModal(false);
       loadKeseharianData(selectedHari);
-    } catch (err) {
-      alert('Gagal menyimpan jadwal bersama');
+    } catch (err: any) {
+      alert(err.message || 'Gagal menyimpan jadwal bersama');
     }
   };
 
@@ -425,18 +433,26 @@ export default function JadwalHarianTab({
       alert('Pilih musyrif');
       return;
     }
-    await createJadwal({
-      ...tetapFormData,
-      hari: Number(tetapFormData.hari),
-    });
-    setShowAddTetapModal(false);
-    onRefresh();
+    try {
+      await createJadwal({
+        ...tetapFormData,
+        hari: Number(tetapFormData.hari),
+      });
+      setShowAddTetapModal(false);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Gagal menambah jadwal');
+    }
   };
 
   const handleDeleteTetap = async (id: string) => {
     if (confirm('Hapus jadwal tetap ini?')) {
-      await deleteJadwal(id);
-      onRefresh();
+      try {
+        await deleteJadwal(id);
+        onRefresh();
+      } catch (err: any) {
+        alert(err.message || 'Gagal menghapus jadwal');
+      }
     }
   };
 

@@ -1,8 +1,9 @@
-import { Env, getDb, jsonResponse, errorResponse } from './_db';
+import { Env, getDb, jsonResponse, errorResponse, ensureTables } from './_db';
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
     const sql = getDb(context.env);
+    await ensureTables(sql);
     const url = new URL(context.request.url);
     const hari = url.searchParams.get('hari');
 
@@ -68,28 +69,31 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const sql = getDb(context.env);
+    await ensureTables(sql);
     const body = (await context.request.json()) as any;
 
     // 1. Action: Duplicate schedule from one day to another
     if (body.action === 'duplicate' && body.fromHari && body.toHari) {
+      const fromHari = Number(body.fromHari);
+      const toHari = Number(body.toHari);
       const source = await sql`
         SELECT kategori, pos_name, petugas_ids, petugas_custom, urutan, keterangan
         FROM jadwal_keseharian
-        WHERE hari = ${body.fromHari}
+        WHERE hari = ${fromHari}
         ORDER BY urutan ASC
       `;
       if (source.length === 0) {
         return errorResponse(`Tidak ada data jadwal untuk hari asal`);
       }
 
-      await sql`DELETE FROM jadwal_keseharian WHERE hari = ${body.toHari}`;
+      await sql`DELETE FROM jadwal_keseharian WHERE hari = ${toHari}`;
       for (let i = 0; i < source.length; i++) {
         const s = source[i];
-        const newId = 'jk_' + body.toHari + '_' + (i + 1) + '_' + Math.random().toString(36).substring(2, 6);
+        const newId = 'jk_' + toHari + '_' + (i + 1) + '_' + Math.random().toString(36).substring(2, 6);
         const idsJson = JSON.stringify(s.petugas_ids || []);
         await sql`
           INSERT INTO jadwal_keseharian (id, hari, kategori, pos_name, petugas_ids, petugas_custom, urutan, keterangan)
-          VALUES (${newId}, ${body.toHari}, ${s.kategori}, ${s.pos_name}, ${idsJson}::jsonb, ${s.petugas_custom || ''}, ${s.urutan}, ${s.keterangan || null})
+          VALUES (${newId}, ${toHari}, ${s.kategori}, ${s.pos_name}, ${idsJson}::jsonb, ${s.petugas_custom || ''}, ${s.urutan}, ${s.keterangan || null})
         `;
       }
       return jsonResponse({ success: true, count: source.length });
@@ -97,6 +101,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     // 2. Action: Init default preset template for a day
     if (body.action === 'init_preset' && body.hari) {
+      const targetHari = Number(body.hari);
       const presets = [
         { kategori: 'UMUM', pos: 'masak nasi', urutan: 1 },
         { kategori: 'UMUM', pos: 'koordinator piket', urutan: 2 },
@@ -112,10 +117,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       ];
 
       for (const p of presets) {
-        const id = 'jk_' + body.hari + '_' + p.urutan + '_' + Math.random().toString(36).substring(2, 6);
+        const id = 'jk_' + targetHari + '_' + p.urutan + '_' + Math.random().toString(36).substring(2, 6);
         await sql`
           INSERT INTO jadwal_keseharian (id, hari, kategori, pos_name, petugas_ids, petugas_custom, urutan)
-          VALUES (${id}, ${body.hari}, ${p.kategori}, ${p.pos}, '[]'::jsonb, '', ${p.urutan})
+          VALUES (${id}, ${targetHari}, ${p.kategori}, ${p.pos}, '[]'::jsonb, '', ${p.urutan})
         `;
       }
       return jsonResponse({ success: true, count: presets.length });
@@ -130,8 +135,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const urutan = Number(body.urutan) || 0;
     const keterangan = body.keterangan || null;
 
-    if (!hari || !posName) {
-      return errorResponse('Hari dan Nama Pos wajib diisi');
+    if (isNaN(hari) || hari < 1 || hari > 7 || !posName) {
+      return errorResponse('Hari (1-7) dan Nama Pos wajib diisi');
     }
 
     const idsJson = JSON.stringify(petugasIds);
@@ -165,6 +170,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 export const onRequestPatch: PagesFunction<Env> = async (context) => {
   try {
     const sql = getDb(context.env);
+    await ensureTables(sql);
     const body = (await context.request.json()) as any;
 
     if (!body.id) return errorResponse('ID pos wajib disertakan');
@@ -190,6 +196,7 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
 export const onRequestDelete: PagesFunction<Env> = async (context) => {
   try {
     const sql = getDb(context.env);
+    await ensureTables(sql);
     const url = new URL(context.request.url);
     const id = url.searchParams.get('id');
 

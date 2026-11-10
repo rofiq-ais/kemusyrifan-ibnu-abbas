@@ -1,9 +1,22 @@
 // Frontend API client calling /api/...
 
+async function handleResponse<T = any>(res: Response, fallbackError: string): Promise<T> {
+  if (!res.ok) {
+    let msg = fallbackError;
+    try {
+      const data = await res.json();
+      msg = data.error || data.message || fallbackError;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export async function fetchMusyrif() {
   const res = await fetch('/api/musyrif');
-  if (!res.ok) throw new Error('Gagal mengambil data musyrif');
-  return res.json();
+  return handleResponse(res, 'Gagal mengambil data musyrif');
 }
 
 export async function createMusyrif(data: { name: string; nickname?: string; phone?: string }) {
@@ -12,8 +25,7 @@ export async function createMusyrif(data: { name: string; nickname?: string; pho
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Gagal menambah musyrif');
-  return res.json();
+  return handleResponse(res, 'Gagal menambah musyrif');
 }
 
 export async function updateMusyrifPhone(id: string, phone: string) {
@@ -22,15 +34,13 @@ export async function updateMusyrifPhone(id: string, phone: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, phone }),
   });
-  if (!res.ok) throw new Error('Gagal memperbarui nomor telepon');
-  return res.json();
+  return handleResponse(res, 'Gagal memperbarui nomor telepon');
 }
 
 export async function fetchJadwal(hari?: number) {
   const url = hari ? `/api/jadwal?hari=${hari}` : '/api/jadwal';
   const res = await fetch(url);
-  if (!res.ok) throw new Error('Gagal mengambil jadwal');
-  return res.json();
+  return handleResponse(res, 'Gagal mengambil jadwal');
 }
 
 export async function createJadwal(data: {
@@ -47,28 +57,24 @@ export async function createJadwal(data: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Gagal menambah jadwal');
-  return res.json();
+  return handleResponse(res, 'Gagal menambah jadwal');
 }
 
 export async function deleteJadwal(id: string) {
   const res = await fetch(`/api/jadwal?id=${id}`, {
     method: 'DELETE',
   });
-  if (!res.ok) throw new Error('Gagal menghapus jadwal');
-  return res.json();
+  return handleResponse(res, 'Gagal menghapus jadwal');
 }
 
 export async function fetchBadalList() {
   const res = await fetch('/api/badal');
-  if (!res.ok) throw new Error('Gagal mengambil daftar badal');
-  return res.json();
+  return handleResponse(res, 'Gagal mengambil daftar badal');
 }
 
 export async function fetchSingleBadal(id: string) {
   const res = await fetch(`/api/badal/${id}`);
-  if (!res.ok) throw new Error('Gagal mengambil data tugas');
-  return res.json();
+  return handleResponse(res, 'Gagal mengambil data tugas');
 }
 
 export async function createBadalTicket(data: {
@@ -85,8 +91,7 @@ export async function createBadalTicket(data: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Gagal membuat tiket badal');
-  return res.json();
+  return handleResponse(res, 'Gagal membuat tiket badal');
 }
 
 export async function claimBadal(id: string, musyrifId: string) {
@@ -95,11 +100,7 @@ export async function claimBadal(id: string, musyrifId: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'claim', musyrifId }),
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || 'Gagal mengklaim tugas');
-  }
-  return res.json();
+  return handleResponse(res, 'Gagal mengklaim tugas');
 }
 
 export async function assignBadal(id: string, musyrifId: string) {
@@ -108,17 +109,12 @@ export async function assignBadal(id: string, musyrifId: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'assign', musyrifId }),
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || 'Gagal menugaskan musyrif');
-  }
-  return res.json();
+  return handleResponse(res, 'Gagal menugaskan musyrif');
 }
 
 export async function fetchFairnessRecommendations(id: string) {
   const res = await fetch(`/api/badal/${id}/recommendations`);
-  if (!res.ok) throw new Error('Gagal mengambil rekomendasi keadilan');
-  return res.json();
+  return handleResponse(res, 'Gagal mengambil rekomendasi keadilan');
 }
 
 export async function unclaimBadal(id: string) {
@@ -127,11 +123,7 @@ export async function unclaimBadal(id: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'unclaim' }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Gagal membatalkan klaim tugas');
-  }
-  return res.json();
+  return handleResponse(res, 'Gagal membatalkan klaim tugas');
 }
 
 export async function reassignBadal(id: string, musyrifId: string) {
@@ -140,11 +132,7 @@ export async function reassignBadal(id: string, musyrifId: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'reassign', musyrifId }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Gagal mengganti pengganti');
-  }
-  return res.json();
+  return handleResponse(res, 'Gagal mengganti musyrif pengganti');
 }
 
 export async function cancelBadal(id: string) {
@@ -153,22 +141,14 @@ export async function cancelBadal(id: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'cancel' }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Gagal membatalkan tiket');
-  }
-  return res.json();
+  return handleResponse(res, 'Gagal membatalkan tiket badal');
 }
 
 export async function deleteBadal(id: string) {
   const res = await fetch(`/api/badal/${id}`, {
     method: 'DELETE',
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Gagal menghapus tiket');
-  }
-  return res.json();
+  return handleResponse(res, 'Gagal menghapus tiket');
 }
 
 export async function updatePin(data: { musyrifId: string; oldPin: string; newPin: string }) {
@@ -177,11 +157,7 @@ export async function updatePin(data: { musyrifId: string; oldPin: string; newPi
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Gagal mengubah PIN');
-  }
-  return res.json();
+  return handleResponse(res, 'Gagal mengubah PIN');
 }
 
 export async function resetRekapBadal(options?: { onlyCompleted?: boolean }) {
@@ -190,25 +166,19 @@ export async function resetRekapBadal(options?: { onlyCompleted?: boolean }) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(options || {}),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Gagal mereset data riwayat');
-  }
-  return res.json();
+  return handleResponse(res, 'Gagal mereset data riwayat');
 }
 
 export async function fetchRekapLeaderboard() {
   const res = await fetch('/api/rekap');
-  if (!res.ok) throw new Error('Gagal mengambil rekapitulasi');
-  return res.json();
+  return handleResponse(res, 'Gagal mengambil rekapitulasi');
 }
 
 // ==================== JADWAL BERSAMA & KESEHARIAN (FORMAT KETUA) ====================
 
 export async function fetchJadwalBersama() {
   const res = await fetch('/api/jadwal-bersama');
-  if (!res.ok) throw new Error('Gagal mengambil jadwal bersama');
-  return res.json();
+  return handleResponse(res, 'Gagal mengambil jadwal bersama');
 }
 
 export async function saveJadwalBersama(items: any[]) {
@@ -217,8 +187,7 @@ export async function saveJadwalBersama(items: any[]) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),
   });
-  if (!res.ok) throw new Error('Gagal menyimpan jadwal bersama');
-  return res.json();
+  return handleResponse(res, 'Gagal menyimpan jadwal bersama');
 }
 
 export async function addJadwalBersamaItem(item: string) {
@@ -227,23 +196,20 @@ export async function addJadwalBersamaItem(item: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ item }),
   });
-  if (!res.ok) throw new Error('Gagal menambah item jadwal bersama');
-  return res.json();
+  return handleResponse(res, 'Gagal menambah item jadwal bersama');
 }
 
 export async function deleteJadwalBersamaItem(id: string) {
   const res = await fetch(`/api/jadwal-bersama?id=${id}`, {
     method: 'DELETE',
   });
-  if (!res.ok) throw new Error('Gagal menghapus item jadwal bersama');
-  return res.json();
+  return handleResponse(res, 'Gagal menghapus item jadwal bersama');
 }
 
 export async function fetchJadwalKeseharian(hari?: number) {
   const url = hari ? `/api/jadwal-keseharian?hari=${hari}` : '/api/jadwal-keseharian';
   const res = await fetch(url);
-  if (!res.ok) throw new Error('Gagal mengambil jadwal keseharian');
-  return res.json();
+  return handleResponse(res, 'Gagal mengambil jadwal keseharian');
 }
 
 export async function saveJadwalKeseharianPos(data: {
@@ -261,8 +227,7 @@ export async function saveJadwalKeseharianPos(data: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Gagal menyimpan pos tugas');
-  return res.json();
+  return handleResponse(res, 'Gagal menyimpan pos tugas');
 }
 
 export async function updateJadwalKeseharianPetugas(id: string, petugasIds: string[], petugasCustom?: string) {
@@ -271,16 +236,14 @@ export async function updateJadwalKeseharianPetugas(id: string, petugasIds: stri
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, petugasIds, petugasCustom }),
   });
-  if (!res.ok) throw new Error('Gagal memperbarui petugas pos');
-  return res.json();
+  return handleResponse(res, 'Gagal memperbarui petugas pos');
 }
 
 export async function deleteJadwalKeseharianPos(id: string) {
   const res = await fetch(`/api/jadwal-keseharian?id=${id}`, {
     method: 'DELETE',
   });
-  if (!res.ok) throw new Error('Gagal menghapus pos tugas');
-  return res.json();
+  return handleResponse(res, 'Gagal menghapus pos tugas');
 }
 
 export async function duplicateJadwalKeseharian(fromHari: number, toHari: number) {
@@ -289,8 +252,7 @@ export async function duplicateJadwalKeseharian(fromHari: number, toHari: number
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'duplicate', fromHari, toHari }),
   });
-  if (!res.ok) throw new Error('Gagal menduplikasi jadwal');
-  return res.json();
+  return handleResponse(res, 'Gagal menduplikasi jadwal');
 }
 
 export async function initPresetJadwalKeseharian(hari: number) {
@@ -299,7 +261,5 @@ export async function initPresetJadwalKeseharian(hari: number) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'init_preset', hari }),
   });
-  if (!res.ok) throw new Error('Gagal membuat template jadwal');
-  return res.json();
+  return handleResponse(res, 'Gagal membuat template jadwal');
 }
-
